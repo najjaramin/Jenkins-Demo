@@ -1,66 +1,135 @@
-# DevOps-Example
-This is a sample Spring Boot Application, used to explain the Jenkins pipeline, in creating a full CI/CD flow using docker too.
+# Jenkins CI/CD — Spring Boot, Docker et Kubernetes
 
-# Jenkins 
-Jenkins is an open source automation server written in Java. Jenkins helps to automate the non-human part of the software development process,
- with continuous integration and facilitating technical aspects of continuous delivery. It is a server-based system that runs in servlet containers 
- such as Apache Tomcat.
- 
-# Docker 
+## Présentation
 
-Docker is a collection of interoperating software-as-a-service and platform-as-a-service offerings that employ operating-system-level virtualization 
-to cultivate development and delivery of software inside standardized software packages called containers. The software that hosts the containers 
-is called Docker Engine.
+Ce projet présente la mise en place d'un environnement DevOps autour de Jenkins, avec l'automatisation de builds, la gestion du code source avec Git et le déploiement d'une application Spring Boot sur Kubernetes via Minikube.
 
-# Using Jenkins with Docker
-First of all to use jenkins with docker, we will have to know that as we are running Jenkins inside a docker container, and we need access to docker to
-build our services images, so first of all let's build a Jenkins image with docker installed inside it. Let's check the dockerfile to 
-build this Jenkins image with docker inside, you will just have to put this file into any folder, and run the docker build command.
+Le travail couvre également la configuration d'un job Jenkins de type Freestyle, l'exécution périodique des builds et la vérification du déploiement de l'application.
 
-# Dockerfile for Jenkins
+## Objectifs
+
+- Comprendre le fonctionnement de Jenkins et des jobs Freestyle.
+- Intégrer un dépôt Git dans Jenkins.
+- Compiler et exécuter une application Java.
+- Automatiser les builds et vérifier leurs résultats.
+- Conteneuriser une application Spring Boot avec Docker.
+- Déployer l'application sur Kubernetes avec Minikube.
+- Documenter les résultats à l'aide de captures d'écran.
+
+## Environnement technique
+
+- **CI/CD :** Jenkins
+- **Gestion de versions :** Git et GitHub
+- **Langage :** Java
+- **Framework :** Spring Boot
+- **Build :** Maven / compilation Java selon le job
+- **Conteneurisation :** Docker
+- **Orchestration :** Kubernetes
+- **Cluster local :** Minikube
+- **Outils Kubernetes :** kubectl
+
+## Étapes réalisées
+
+### 1. Création d'un job Freestyle Jenkins
+
+Un job Freestyle a été créé afin d'exécuter des commandes shell et de vérifier le fonctionnement de l'environnement Jenkins.
+
+Le job exécute notamment des commandes de diagnostic et crée un fichier de test.
+
+### 2. Exécution du programme Java
+
+Le job compile et exécute le fichier `Test.java`. Le résultat est consultable dans la console du build Jenkins.
+
+### 3. Intégration Git
+
+Le dépôt Git est configuré comme source du projet. Jenkins récupère le code depuis la branche `main`, puis exécute les étapes de build.
+
+### 4. Automatisation périodique
+
+Une planification Jenkins a été configurée avec l'expression cron :
+
+```text
+H/5 * * * *
 ```
-from jenkins/jenkins:lts
-USER root
-RUN apt-get update -qq \
-    && apt-get install -qqy apt-transport-https ca-certificates curl gnupg2 software-properties-common
-RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
-RUN add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/debian \
-   $(lsb_release -cs) \
-   stable"
-RUN apt-get update  -qq \
-    && apt-get install docker-ce=17.12.1~ce-0~debian -y
-RUN usermod -aG docker jenkins
+
+Cette expression demande une exécution approximativement toutes les cinq minutes, selon la planification Jenkins et la disponibilité du nœud d'exécution.
+
+L'option de suppression de l'espace de travail avant le build a également été configurée.
+
+### 5. Déploiement sur Kubernetes
+
+L'application Spring Boot a été déployée dans Minikube avec un Deployment de deux réplicas.
+
+Le Service Kubernetes `spring-app-service` a été créé de type `NodePort`. L'application a répondu avec le code HTTP `200` lors d'un test effectué avec `curl`.
+
+Résultats observés :
+
+- Deployment : `spring-app-deployment`
+- Réplicas disponibles : `2/2`
+- Pods : `Running`
+- Service : `spring-app-service`
+- NodePort observé : `30517`
+- Réponse HTTP : `200 OK`
+
+### 6. Vérification des builds
+
+Les builds Jenkins `#12` et `#13` ont été observés avec un statut réussi dans l'interface Jenkins.
+
+
+
+Afficher les nœuds :
+
+```bash
+kubectl get nodes
 ```
 
-Just place this Dockerfile in any folder and run the following commands:
+Afficher le Deployment :
 
-$ docker image build -t jenkins-docker .
+```bash
+kubectl get deployments
+```
 
-Now that the docker image has already been built, we can run the Jenkins in a docker container with the command:
+Afficher les Pods :
 
-$ docker container run -d -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock jenkins-docker
+```bash
+kubectl get pods -o wide
+```
 
-# Building Spring Boot Application
-The Sample application built here has the maven jar plugin, so in order to build that as a jar, we just have to do the command:
+Afficher les Services :
 
-$ mvn clean install
+```bash
+kubectl get services
+```
 
-# Using with AWS ECS and ECR
+Tester l'application depuis le serveur :
 
-First of all you will have to push your image to Amazon ECR, so in order to do this via command line interface, we have to have
-the aws cli installed on our computer. After that we will have to synchronize the docker login with the AWS account, with the command:
+```bash
+curl -i http://$(minikube ip):30517
+```
 
-$(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+## Résultats
 
-After that you will sync the two accounts, and are able to build and push your image. So, just build the image:
+Les builds Jenkins documentés ont réussi. Le Deployment Kubernetes dispose de deux réplicas prêts et l'application a retourné une réponse HTTP `200` lors du test de connectivité.
 
-$ docker build -t devops-service . 
+La mise en place constitue une base pratique pour approfondir l'intégration continue, la livraison continue et l'automatisation du déploiement.
 
-Tag you image:
+## Améliorations possibles
 
-$ docker tag devops-service:latest $AWS_IAM_USER_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/devops-service:latest
+- Construire automatiquement l'image Docker à chaque modification du code.
+- Publier l'image dans un registre de conteneurs.
+- Déclencher les builds à l'aide d'un webhook GitHub.
+- Automatiser le déploiement Kubernetes depuis Jenkins.
+- Ajouter des tests automatisés et des contrôles de sécurité.
+- Gérer les credentials via Jenkins Credentials, sans les stocker dans le dépôt.
 
-Finally run thios command for pushing the image:
+## Sécurité
 
-docker push $AWS_IAM_USER_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/devops-service:latest
+Aucun mot de passe Jenkins, token GitHub, clé privée SSH ou secret d'accès ne doit être publié dans ce dépôt.
+
+Les captures doivent masquer les informations d'authentification et les données sensibles.
+
+## Auteur
+
+Amin Najjar
+
+Projet pratique DevOps / CI-CD — Jenkins, Docker et Kubernetes.
