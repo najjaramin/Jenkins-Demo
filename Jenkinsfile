@@ -1,99 +1,77 @@
 pipeline {
     agent any
 
-    environment {
-        // The MY_KUBECONFIG environment variable will be assigned
-        // the value of a temporary file.  For example:
-        //   /home/user/.jenkins/workspace/cred_test@tmp/secretFiles/546a5cf3-9b56-4165-a0fd-19e2afe6b31f/kubeconfig.txt
-        // MY_KUBECONFIG = credentials('my-kubeconfig')
-        registry = "wahidh007/demo-jenkins"
-        registryCredential = 'docker-hub-credentials'
-        dockerImage = ''        
+    triggers {
+        pollSCM('H/5 * * * *')
     }
 
-
-    // tools {
-    //     // Install the Maven version configured as "M3" and add it to the path.
-    //     maven "M3"
-    // }
-
-    // Poll every 5 minutes, if there is a new code Jenkins will run the job
-    triggers {
-        pollSCM('*/5 * * * *')
+    environment {
+        IMAGE_NAME = 'demo-jenkins'
+        CONTAINER_NAME = 'demo-jenkins'
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/wahid007/Jenkins-Demo.git'
-                // git 'https://github.com/wahid007/Jenkins-Demo'
-            }
-
-        }
-        
-        stage('Build App') {
-            steps {
-                sh "mvn clean package"
+                checkout scm
             }
         }
-        
-        stage('Build image') {
-          steps{
-              // sh "docker build -t $registry:$BUILD_NUMBER ."
-              script {
-                dockerImage = docker.build registry + ":$BUILD_NUMBER"   
-              }          
-          }
-        }       
 
-        // // Add docker hub credentials in Jenkins : Go to Credentials → Global → Add credentials 
-        // stage('Push image') {
-        //   steps{
-        //     script {
-        //       // docker.withRegistry('https://registry.hub.docker.com', registryCredential) {
-        //       docker.withRegistry('', registryCredential ) {
-        //         dockerImage.push()
-        //       }
-        //     }
-        //   }
-        // }
-
-        stage('Deploy Docker container'){
-          steps {
-            // sh "docker stop ${IMAGE_NAME} || true && docker rm $registry:$BUILD_NUMBER || true"
-            sh "docker run --name demo-jenkins -d -p 2222:2222 $registry:$BUILD_NUMBER"
-            slackSend color: "good", message: registry + ":$BUILD_NUMBER" + " - image successfully created! :man_dancing:"
-          }
+        stage('Build App with Maven') {
+            steps {
+                sh 'mvn -B clean package'
+            }
         }
 
-        // stage('Deploy K8S'){
-        //   steps {
-        //     sh "kubectl apply -f k8s.yml"
-        //   }
-        // }
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
+            }
+        }
 
-        // stage('Verify deployment'){
-        //   steps {
-        //     sh "kubectl get pods"
-        //     sh "kubectl get svc"
-        //   }
-        // }
+        stage('Deploy Docker Container') {
+            steps {
+                sh '''
+                    docker rm -f ${CONTAINER_NAME} 2>/dev/null || true
 
-        // stage('Cleaning up') {
-        //   steps{
-        //     sh "docker rmi $registry:$BUILD_NUMBER"
-        //   }
-        // }        
+                    docker run -d \
+                      --name ${CONTAINER_NAME} \
+                      -p 2222:2222 \
+                      ${IMAGE_NAME}:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                    echo "===== CONTAINER STATUS ====="
+                    docker ps --filter "name=${CONTAINER_NAME}"
+
+                    echo "===== APPLICATION CHECK ====="
+                    for i in $(seq 1 30); do
+                        if curl -fsS http://127.0.0.1:2222/ -o /dev/null; then
+                            echo "Application HTTP check: SUCCESS"
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+
+                    echo "Application did not respond on port 2222"
+                    docker logs ${CONTAINER_NAME}
+                    exit 1
+                '''
+            }
+        }
     }
-    
+
     post {
         success {
-            echo 'Pipeline execution successful!'
-            slackSend color: "good", message: "Pipeline execution successful! :man_dancing:"
+            echo 'Pipeline CI/CD completed successfully!'
         }
+
         failure {
-            echo 'Pipeline execution failed.'
-            slackSend color: "danger", message: "Pipeline execution failed! :ghost:"
+            echo 'Pipeline failed. Check the stage logs.'
         }
-    }    
+    }
 }
