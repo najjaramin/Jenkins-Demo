@@ -1,135 +1,176 @@
-# Jenkins CI/CD — Spring Boot, Docker et Kubernetes
+# Jenkins CI/CD — Spring Boot, Maven, Docker et Kubernetes
 
 ## Présentation
 
-Ce projet présente la mise en place d'un environnement DevOps autour de Jenkins, avec l'automatisation de builds, la gestion du code source avec Git et le déploiement d'une application Spring Boot sur Kubernetes via Minikube.
-
-Le travail couvre également la configuration d'un job Jenkins de type Freestyle, l'exécution périodique des builds et la vérification du déploiement de l'application.
+Ce projet présente des travaux pratiques DevOps avec Jenkins, Git/GitHub, Java, Maven, Docker et Kubernetes. Il couvre un job Freestyle, un pipeline déclaratif CI/CD et des exercices Kubernetes/Minikube documentés séparément.
 
 ## Objectifs
 
-- Comprendre le fonctionnement de Jenkins et des jobs Freestyle.
-- Intégrer un dépôt Git dans Jenkins.
-- Compiler et exécuter une application Java.
-- Automatiser les builds et vérifier leurs résultats.
-- Conteneuriser une application Spring Boot avec Docker.
-- Déployer l'application sur Kubernetes avec Minikube.
-- Documenter les résultats à l'aide de captures d'écran.
+- Intégrer un dépôt GitHub dans Jenkins.
+- Compiler et empaqueter une application Spring Boot avec Maven.
+- Construire une image Docker et lancer un conteneur.
+- Vérifier le statut du conteneur et la réponse HTTP.
+- Documenter les étapes et les résultats avec des captures d'écran.
 
 ## Environnement technique
 
 - **CI/CD :** Jenkins
-- **Gestion de versions :** Git et GitHub
+- **Versioning :** Git et GitHub
 - **Langage :** Java
 - **Framework :** Spring Boot
-- **Build :** Maven / compilation Java selon le job
+- **Build :** Maven
 - **Conteneurisation :** Docker
-- **Orchestration :** Kubernetes
-- **Cluster local :** Minikube
-- **Outils Kubernetes :** kubectl
+- **Orchestration :** Kubernetes / Minikube
+- **CLI Kubernetes :** kubectl
 
-## Étapes réalisées
+## 1. Job Jenkins Freestyle
 
-### 1. Création d'un job Freestyle Jenkins
+Un job Freestyle a été utilisé pour exécuter des commandes shell, récupérer le code source depuis Git et compiler/exécuter un programme Java.
 
-Un job Freestyle a été créé afin d'exécuter des commandes shell et de vérifier le fonctionnement de l'environnement Jenkins.
-
-Le job exécute notamment des commandes de diagnostic et crée un fichier de test.
-
-### 2. Exécution du programme Java
-
-Le job compile et exécute le fichier `Test.java`. Le résultat est consultable dans la console du build Jenkins.
-
-### 3. Intégration Git
-
-Le dépôt Git est configuré comme source du projet. Jenkins récupère le code depuis la branche `main`, puis exécute les étapes de build.
-
-### 4. Automatisation périodique
-
-Une planification Jenkins a été configurée avec l'expression cron :
+Une planification périodique a été configurée avec :
 
 ```text
 H/5 * * * *
 ```
 
-Cette expression demande une exécution approximativement toutes les cinq minutes, selon la planification Jenkins et la disponibilité du nœud d'exécution.
+Cette expression demande à Jenkins de planifier les exécutions à une fréquence approximative de cinq minutes.
 
-L'option de suppression de l'espace de travail avant le build a également été configurée.
+## 2. Exercices Kubernetes / Minikube
 
-### 5. Déploiement sur Kubernetes
-
-L'application Spring Boot a été déployée dans Minikube avec un Deployment de deux réplicas.
-
-Le Service Kubernetes `spring-app-service` a été créé de type `NodePort`. L'application a répondu avec le code HTTP `200` lors d'un test effectué avec `curl`.
-
-Résultats observés :
+Les résultats précédemment documentés pour cet exercice étaient :
 
 - Deployment : `spring-app-deployment`
 - Réplicas disponibles : `2/2`
-- Pods : `Running`
 - Service : `spring-app-service`
+- Type : `NodePort`
 - NodePort observé : `30517`
-- Réponse HTTP : `200 OK`
+- Réponse HTTP observée : `200 OK`
 
-### 6. Vérification des builds
-
-Les builds Jenkins `#12` et `#13` ont été observés avec un statut réussi dans l'interface Jenkins.
-
-
-
-Afficher les nœuds :
+Commandes de vérification :
 
 ```bash
 kubectl get nodes
-```
-
-Afficher le Deployment :
-
-```bash
 kubectl get deployments
-```
-
-Afficher les Pods :
-
-```bash
 kubectl get pods -o wide
-```
-
-Afficher les Services :
-
-```bash
 kubectl get services
-```
-
-Tester l'application depuis le serveur :
-
-```bash
 curl -i http://$(minikube ip):30517
 ```
 
-## Résultats
+Ces valeurs sont les résultats consignés précédemment ; elles ne confirment pas l'état actuel du cluster.
 
-Les builds Jenkins documentés ont réussi. Le Deployment Kubernetes dispose de deux réplicas prêts et l'application a retourné une réponse HTTP `200` lors du test de connectivité.
+## 3. Pipeline CI/CD Jenkins avec Maven et Docker
 
-La mise en place constitue une base pratique pour approfondir l'intégration continue, la livraison continue et l'automatisation du déploiement.
+Le job Pipeline `Jenkins-Demo` utilise le dépôt GitHub :
 
-## Améliorations possibles
+`https://github.com/najjaramin/Jenkins-Demo.git`
 
-- Construire automatiquement l'image Docker à chaque modification du code.
-- Publier l'image dans un registre de conteneurs.
-- Déclencher les builds à l'aide d'un webhook GitHub.
-- Automatiser le déploiement Kubernetes depuis Jenkins.
+Configuration SCM :
+- **SCM :** Git
+- **Branche :** `*/main`
+- **Script Path :** `Jenkinsfile`
+- **Credentials :** aucune pour le dépôt public HTTPS
+
+### Outils et plugins Jenkins
+
+Plugins installés :
+- Pipeline Maven Integration
+- Docker Pipeline
+- Kubernetes CLI
+- Oracle Java SE Development Kit Installer
+
+Outils configurés dans **Administrer Jenkins → Tools** :
+- JDK : `JDK-21`
+- Maven : `Maven-3`
+
+Le pipeline utilise Maven et Docker. L'installation du plugin Kubernetes CLI ne signifie pas que ce pipeline réalise actuellement un déploiement Kubernetes.
+
+### Étapes du pipeline
+
+1. **Checkout** — récupération du code source depuis Git.
+2. **Build App with Maven** — exécution de `mvn -B clean package`.
+3. **Build Docker Image** — construction de l'image Docker avec un tag associé au numéro du build Jenkins.
+4. **Deploy Docker Container** — remplacement de l'ancien conteneur puis lancement du nouveau.
+5. **Verify Deployment** — vérification du conteneur et de la réponse HTTP.
+
+Le `Jenkinsfile` contient un déclencheur de sondage SCM :
+
+```groovy
+triggers {
+    pollSCM('H/5 * * * *')
+}
+```
+
+Le déclenchement automatique après un nouveau `git push` doit être testé séparément.
+
+### Dockerfile
+
+Le Dockerfile utilise Eclipse Temurin 17 comme environnement Java d'exécution :
+
+```dockerfile
+FROM eclipse-temurin:17-jre
+VOLUME /tmp
+COPY target/devOpsDemo-0.0.1-SNAPSHOT.jar /app.jar
+EXPOSE 2222
+ENTRYPOINT ["java", "-jar", "/app.jar"]
+```
+
+### Vérification du déploiement
+
+Commandes exécutées sur le serveur :
+
+```bash
+docker ps --filter "name=demo-jenkins"
+curl -I http://127.0.0.1:2222/
+```
+
+Résultats observés :
+- Conteneur `demo-jenkins` en état `Up`.
+- Image : `demo-jenkins:1`.
+- Port publié : `2222:2222`.
+- Réponse HTTP : `200`.
+- Console Jenkins : `Application HTTP check: SUCCESS` et `Finished: SUCCESS`.
+
+La console montrait quelques erreurs temporaires de connexion au démarrage, puis la vérification HTTP a réussi.
+
+### Captures d'écran
+
+#### Création du job Pipeline
+
+![Création du job Pipeline Jenkins](doc/jenkins-pipeline-job-creation.png)
+
+#### Configuration du dépôt Git
+
+![Configuration SCM du job Jenkins-Demo](doc/jenkins-pipeline-scm-config.png)
+
+#### Résultat du pipeline
+
+![Console du build Jenkins réussi](doc/jenkins-pipeline-success.png)
+
+## 4. Commandes utiles
+
+```bash
+git status
+git log -1 --oneline
+docker ps --filter "name=demo-jenkins"
+docker logs demo-jenkins
+curl -I http://127.0.0.1:2222/
+```
+
+## 5. Améliorations possibles
+
+- Tester le déclenchement du pipeline après un `git push`.
+- Configurer un webhook GitHub si nécessaire.
+- Publier l'image dans un registre Docker.
 - Ajouter des tests automatisés et des contrôles de sécurité.
-- Gérer les credentials via Jenkins Credentials, sans les stocker dans le dépôt.
+- Ajouter un déploiement Kubernetes automatisé si cela fait partie de la suite du laboratoire.
+- Gérer les secrets avec Jenkins Credentials.
 
 ## Sécurité
 
-Aucun mot de passe Jenkins, token GitHub, clé privée SSH ou secret d'accès ne doit être publié dans ce dépôt.
-
-Les captures doivent masquer les informations d'authentification et les données sensibles.
+Ne jamais publier de mot de passe Jenkins, de token GitHub, de clé privée SSH ou d'autres secrets. Vérifier les captures avant publication.
 
 ## Auteur
 
-Amin Najjar
+**Amin Najjar**
 
-Projet pratique DevOps / CI-CD — Jenkins, Docker et Kubernetes.
+Projet pratique DevOps / CI-CD — Jenkins, Maven, Docker et Kubernetes.
